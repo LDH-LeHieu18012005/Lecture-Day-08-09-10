@@ -144,6 +144,15 @@ cp .env.example .env
 
 ## Chạy pipeline
 
+### Lệnh nộp bài đã kiểm chứng
+
+```bash
+python etl_pipeline.py run --run-id final-clean
+python eval_retrieval.py --out artifacts/eval/after_fix_eval.csv
+python grading_run.py --out artifacts/eval/grading_run.jsonl
+python instructor_quick_check.py --grading artifacts/eval/grading_run.jsonl --manifest artifacts/manifests/manifest_final-clean.json
+```
+
 ### Luồng chuẩn (sau khi đã sửa pipeline)
 
 ```bash

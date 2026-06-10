@@ -17,6 +17,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from retrieval_utils import rerank_candidates
+
 load_dotenv()
 
 ROOT = Path(__file__).resolve().parent
@@ -80,9 +82,13 @@ def main() -> int:
         w.writeheader()
         for q in questions:
             text = q["question"]
-            res = col.query(query_texts=[text], n_results=args.top_k)
+            candidate_k = max(args.top_k, 20)
+            res = col.query(query_texts=[text], n_results=candidate_k)
             docs = (res.get("documents") or [[]])[0]
             metas = (res.get("metadatas") or [[]])[0]
+            docs, metas = rerank_candidates(text, docs, metas)
+            docs = docs[: args.top_k]
+            metas = metas[: args.top_k]
             top_doc = (metas[0] or {}).get("doc_id", "") if metas else ""
             preview = (docs[0] or "")[:180].replace("\n", " ") if docs else ""
             blob = " ".join(docs).lower()

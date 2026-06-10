@@ -20,6 +20,13 @@ from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
 
+def safe_print(text: str) -> None:
+    try:
+        print(text)
+    except UnicodeEncodeError:
+        print(text.encode("ascii", "backslashreplace").decode("ascii"))
+
+
 def _load_jsonl(path: Path) -> List[Dict[str, Any]]:
     lines: List[Dict[str, Any]] = []
     with path.open(encoding="utf-8") as f:
@@ -70,15 +77,15 @@ def check_grading_jsonl(path: Path) -> Tuple[int, List[str]]:
         msgs.append(f"GRADE_CHECK[{gid}] {sym} :: {label}")
 
     _check_line("gq_d10_01", "refund window 7 ngày + không forbidden 14 ngày")
-    _check_line("gq_d10_02", "refund exception hàng kỹ thuật số")
-    _check_line("gq_d10_03", "Finance 3-5 ngày xử lý", need_top1=True)
-    _check_line("gq_d10_04", "SLA P1 first response 15 phút")
-    _check_line("gq_d10_05", "SLA P1 resolution 4 giờ")
-    _check_line("gq_d10_06", "SLA P1 escalation 10 phút")
-    _check_line("gq_d10_07", "IT lockout 5 lần")
-    _check_line("gq_d10_08", "VPN 2 thiết bị")
-    _check_line("gq_d10_09", "HR 12 ngày phép năm + không stale 10 ngày", need_top1=True)
-    _check_line("gq_d10_10", "access control Level 4 IT Manager + CISO", need_top1=True)
+    _check_line("gq_d10_02", "Finance 3-5 ngày xử lý", need_top1=True)
+    _check_line("gq_d10_03", "SLA P1 first response 15 phút", need_top1=True)
+    _check_line("gq_d10_04", "SLA P1 resolution 4 giờ", need_top1=True)
+    _check_line("gq_d10_05", "Slack #incident-p1", need_top1=True)
+    _check_line("gq_d10_06", "IT lockout 5 lần", need_top1=True)
+    _check_line("gq_d10_07", "password rotation 90 ngày", need_top1=True)
+    _check_line("gq_d10_08", "HR 12 ngày phép năm + không stale 10 ngày", need_top1=True)
+    _check_line("gq_d10_09", "access control Level 4 IT Manager + CISO", need_top1=True)
+    _check_line("gq_d10_10", "Standard Access 2 ngày làm việc", need_top1=True)
 
     merit_fail = any("GRADE_CHECK[" in m and "] FAIL ::" in m for m in msgs)
     fails = [m for m in msgs if m.startswith("FAIL:")]
@@ -116,13 +123,13 @@ def main() -> int:
 
     code, msgs = check_grading_jsonl(Path(args.grading))
     for m in msgs:
-        print(m)
+        safe_print(m)
 
     if args.manifest:
         c2, m2 = check_manifest(Path(args.manifest))
         code = max(code, c2)
         for m in m2:
-            print(m)
+            safe_print(m)
 
     return code
 

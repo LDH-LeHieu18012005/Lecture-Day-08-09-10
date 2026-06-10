@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
 
@@ -109,6 +110,76 @@ def run_expectations(cleaned_rows: List[Dict[str, Any]]) -> Tuple[List[Expectati
             ok6,
             "halt",
             f"violations={len(bad_hr_annual)}",
+        )
+    )
+
+    # E7: tất cả nguồn canonical dùng trong bộ test phải còn hiện diện sau clean.
+    required_doc_ids = {
+        "policy_refund_v4",
+        "sla_p1_2026",
+        "it_helpdesk_faq",
+        "hr_leave_policy",
+        "access_control_sop",
+    }
+    present_doc_ids = {str(r.get("doc_id") or "") for r in cleaned_rows}
+    missing_doc_ids = sorted(required_doc_ids - present_doc_ids)
+    ok7 = not missing_doc_ids
+    results.append(
+        ExpectationResult(
+            "required_canonical_doc_ids_present",
+            ok7,
+            "halt",
+            f"missing_doc_ids={missing_doc_ids}",
+        )
+    )
+
+    # E8: exported_at phải parse được để freshness monitor không dựa vào timestamp rác.
+    exported_bad = []
+    for r in cleaned_rows:
+        ts = str(r.get("exported_at") or "").strip()
+        try:
+            datetime.fromisoformat(ts)
+        except ValueError:
+            exported_bad.append(r)
+    ok8 = len(exported_bad) == 0
+    results.append(
+        ExpectationResult(
+            "exported_at_parseable_iso_datetime",
+            ok8,
+            "halt",
+            f"invalid_exported_at={len(exported_bad)}",
+        )
+    )
+
+    # E9: marker dữ liệu mơ hồ không được publish vào vector store.
+    unclear = [
+        r
+        for r in cleaned_rows
+        if "Nội dung không rõ ràng" in (r.get("chunk_text") or "")
+    ]
+    ok9 = len(unclear) == 0
+    results.append(
+        ExpectationResult(
+            "no_unclear_content_marker",
+            ok9,
+            "halt",
+            f"unclear_chunks={len(unclear)}",
+        )
+    )
+
+    # E10: cảnh báo nếu một nguồn canonical có quá ít chunk, thường là allowlist/quarantine sai.
+    doc_counts: Dict[str, int] = {}
+    for r in cleaned_rows:
+        doc = str(r.get("doc_id") or "")
+        doc_counts[doc] = doc_counts.get(doc, 0) + 1
+    low_volume = sorted(doc for doc in required_doc_ids if doc_counts.get(doc, 0) < 2)
+    ok10 = not low_volume
+    results.append(
+        ExpectationResult(
+            "canonical_doc_min_two_chunks",
+            ok10,
+            "warn",
+            f"low_volume_doc_ids={low_volume}; counts={doc_counts}",
         )
     )
 

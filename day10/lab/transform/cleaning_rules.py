@@ -20,11 +20,15 @@ ALLOWED_DOC_IDS = frozenset(
         "sla_p1_2026",
         "it_helpdesk_faq",
         "hr_leave_policy",
+        "access_control_sop",
     }
 )
 
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _DMY_SLASH = re.compile(r"^(\d{2})/(\d{2})/(\d{4})$")
+_ISO_DATETIME = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$")
+_SLASH_DATETIME = re.compile(r"^(\d{4})/(\d{2})/(\d{2})T(\d{2}:\d{2}:\d{2})$")
+_REPEATED_WORKDAY = re.compile(r"(ngày làm việc)(?:\s+làm việc)+", re.IGNORECASE)
 
 
 def _norm_text(s: str) -> str:
@@ -53,6 +57,28 @@ def _normalize_effective_date(raw: str) -> Tuple[str, str]:
     return "", "invalid_effective_date_format"
 
 
+def _normalize_exported_at(raw: str) -> Tuple[str, str]:
+    """
+    Trả về (iso_datetime, error_reason).
+    Export bẩn có cả dạng 2026/04/07T00:00:00 nên chuẩn hoá về ISO bằng dấu "-".
+    """
+    s = (raw or "").strip()
+    if not s:
+        return "", "missing_exported_at"
+    if _ISO_DATETIME.match(s):
+        return s, ""
+    m = _SLASH_DATETIME.match(s)
+    if m:
+        yyyy, mm, dd, clock = m.group(1), m.group(2), m.group(3), m.group(4)
+        return f"{yyyy}-{mm}-{dd}T{clock}", ""
+    return "", "invalid_exported_at_format"
+
+
+def _repair_repeated_workday(text: str) -> str:
+    """Sửa lỗi sync lặp cụm 'làm việc' để chunk không làm nhiễu keyword retrieval."""
+    return _REPEATED_WORKDAY.sub(r"\1", text)
+
+
 def load_raw_csv(path: Path) -> List[Dict[str, str]]:
     rows: List[Dict[str, str]] = []
     with path.open(encoding="utf-8", newline="") as f:
@@ -77,6 +103,11 @@ def clean_rows(
     4) Quarantine: chunk_text rỗng hoặc effective_date rỗng sau chuẩn hoá.
     5) Loại trùng nội dung chunk_text (giữ bản đầu).
     6) Fix stale refund: policy_refund_v4 chứa '14 ngày làm việc' → 7 ngày.
+    7) Cho phép nguồn canonical access_control_sop để phục vụ câu hỏi access-control.
+    8) Chuẩn hoá exported_at dạng slash date; quarantine timestamp không parse được.
+    9) Quarantine chunk có marker "Nội dung không rõ ràng".
+    10) Sửa lỗi lặp cụm "làm việc làm việc" trong chunk_text.
+    11) Quarantine chunk HR ghi rõ bản 2025 hoặc "10 ngày phép năm" dù effective_date mới.
     """
     quarantine: List[Dict[str, Any]] = []
     seen_text: set[str] = set()
@@ -91,6 +122,11 @@ def clean_rows(
 
         if doc_id not in ALLOWED_DOC_IDS:
             quarantine.append({**raw, "reason": "unknown_doc_id"})
+            continue
+
+        exp_norm, exp_err = _normalize_exported_at(exported_at)
+        if exp_err:
+            quarantine.append({**raw, "reason": exp_err, "exported_at_raw": exported_at})
             continue
 
         eff_norm, eff_err = _normalize_effective_date(eff_raw)
@@ -111,8 +147,22 @@ def clean_rows(
             )
             continue
 
+        if doc_id == "hr_leave_policy" and ("bản HR 2025" in text or "10 ngày phép năm" in text):
+            quarantine.append(
+                {
+                    **raw,
+                    "reason": "stale_hr_policy_content",
+                    "effective_date_normalized": eff_norm,
+                }
+            )
+            continue
+
         if not text:
             quarantine.append({**raw, "reason": "missing_chunk_text"})
+            continue
+
+        if "Nội dung không rõ ràng" in text:
+            quarantine.append({**raw, "reason": "unclear_content_marker"})
             continue
 
         key = _norm_text(text)
@@ -122,6 +172,7 @@ def clean_rows(
         seen_text.add(key)
 
         fixed_text = text
+        fixed_text = _repair_repeated_workday(fixed_text)
         if apply_refund_window_fix and doc_id == "policy_refund_v4":
             if "14 ngày làm việc" in fixed_text:
                 fixed_text = fixed_text.replace(
@@ -137,7 +188,7 @@ def clean_rows(
                 "doc_id": doc_id,
                 "chunk_text": fixed_text,
                 "effective_date": eff_norm,
-                "exported_at": exported_at or "",
+                "exported_at": exp_norm,
             }
         )
 

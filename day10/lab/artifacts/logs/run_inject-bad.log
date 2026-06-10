@@ -1,0 +1,38 @@
+run_id=inject-bad
+raw_records=247
+cleaned_records=37
+quarantine_records=210
+cleaned_csv=artifacts\cleaned\cleaned_inject-bad.csv
+quarantine_csv=artifacts\quarantine\quarantine_inject-bad.csv
+expectation[min_one_row] OK (halt) :: cleaned_rows=37
+expectation[no_empty_doc_id] OK (halt) :: empty_doc_id_count=0
+expectation[refund_no_stale_14d_window] FAIL (halt) :: violations=2
+expectation[chunk_min_length_8] OK (warn) :: short_chunks=0
+expectation[effective_date_iso_yyyy_mm_dd] OK (halt) :: non_iso_rows=0
+expectation[hr_leave_no_stale_10d_annual] OK (halt) :: violations=0
+expectation[required_canonical_doc_ids_present] OK (halt) :: missing_doc_ids=[]
+expectation[exported_at_parseable_iso_datetime] OK (halt) :: invalid_exported_at=0
+expectation[no_unclear_content_marker] OK (halt) :: unclear_chunks=0
+expectation[canonical_doc_min_two_chunks] OK (warn) :: low_volume_doc_ids=[]; counts={'policy_refund_v4': 12, 'it_helpdesk_faq': 8, 'sla_p1_2026': 5, 'access_control_sop': 6, 'hr_leave_policy': 6}
+run_id=inject-bad
+raw_records=247
+cleaned_records=37
+quarantine_records=210
+cleaned_csv=artifacts\cleaned\cleaned_inject-bad.csv
+quarantine_csv=artifacts\quarantine\quarantine_inject-bad.csv
+expectation[min_one_row] OK (halt) :: cleaned_rows=37
+expectation[no_empty_doc_id] OK (halt) :: empty_doc_id_count=0
+expectation[refund_no_stale_14d_window] FAIL (halt) :: violations=2
+expectation[chunk_min_length_8] OK (warn) :: short_chunks=0
+expectation[effective_date_iso_yyyy_mm_dd] OK (halt) :: non_iso_rows=0
+expectation[hr_leave_no_stale_10d_annual] OK (halt) :: violations=0
+expectation[required_canonical_doc_ids_present] OK (halt) :: missing_doc_ids=[]
+expectation[exported_at_parseable_iso_datetime] OK (halt) :: invalid_exported_at=0
+expectation[no_unclear_content_marker] OK (halt) :: unclear_chunks=0
+expectation[canonical_doc_min_two_chunks] OK (warn) :: low_volume_doc_ids=[]; counts={'policy_refund_v4': 12, 'it_helpdesk_faq': 8, 'sla_p1_2026': 5, 'access_control_sop': 6, 'hr_leave_policy': 6}
+WARN: expectation failed but --skip-validate -> tiep tuc embed (chi dung cho demo Sprint 3).
+embed_prune_removed=2
+embed_upsert count=37 collection=day10_kb
+manifest_written=artifacts\manifests\manifest_inject-bad.json
+freshness_check=FAIL {"latest_exported_at": "2026-04-11T00:00:00", "age_hours": 1446.87, "sla_hours": 24.0, "reason": "freshness_sla_exceeded"}
+PIPELINE_OK
